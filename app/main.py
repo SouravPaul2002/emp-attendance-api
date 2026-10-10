@@ -882,14 +882,22 @@ def late_leaderboard(
 
 
 def build_department_trend_pipeline(department: str, from_date: str, to_date: str) -> List[Dict[str, Any]]:
-    emp_codes = [e["emp_code"] for e in db.employees.find({"department": department}, {"emp_code": 1})]
     from_dt = datetime.fromisoformat(from_date).replace(tzinfo=timezone.utc)
     to_dt = datetime.fromisoformat(to_date).replace(tzinfo=timezone.utc) + timedelta(days=1)
 
     return [
         {"$match": {
-            "emp_code": {"$in": emp_codes},
             "date": {"$gte": from_date, "$lte": to_date}
+        }},
+        {"$lookup": {
+            "from": "employees",
+            "localField": "emp_code",
+            "foreignField": "emp_code",
+            "as": "emp"
+        }},
+        {"$unwind": "$emp"},
+        {"$match": {
+            "emp.department": department
         }},
         {"$unionWith": {
             "pipeline": [
