@@ -21,28 +21,35 @@ from pymongo.errors import DuplicateKeyError, PyMongoError
 
 load_dotenv(override=False)
 
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-MONGO_DB = os.getenv("MONGO_DB", "attendance_db")
+MONGO_URI = os.getenv("MONGO_URI")
+MONGO_DB = os.getenv("MONGO_DB")
 
-client = MongoClient(MONGO_URI)
+if not MONGO_URI:
+    raise RuntimeError("MONGO_URI environment variable is required")
+if not MONGO_DB:
+    raise RuntimeError("MONGO_DB environment variable is required")
+
+client = MongoClient(
+    MONGO_URI,
+    serverSelectionTimeoutMS=5000,
+    tz_aware=True,
+    tzinfo=timezone.utc,
+)
 db = client[MONGO_DB]
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
 
 def init_db():
-    try:
-        db.employees.create_index([("emp_code", ASCENDING)], unique=True)
-        db.employees.create_index([("department", ASCENDING), ("joined_on", ASCENDING)])
-        db.employees.create_index([("joined_on", ASCENDING)])
+    db.employees.create_index([("emp_code", ASCENDING)], unique=True)
+    db.employees.create_index([("department", ASCENDING), ("joined_on", ASCENDING)])
+    db.employees.create_index([("joined_on", ASCENDING)])
 
-        db.attendance_logs.create_index([("emp_code", ASCENDING), ("date", ASCENDING)], unique=True)
-        db.attendance_logs.create_index([("date", DESCENDING), ("emp_code", ASCENDING)])
-        db.attendance_logs.create_index([("date", ASCENDING), ("late_minutes", ASCENDING), ("emp_code", ASCENDING)])
-        db.attendance_logs.create_index([("status", ASCENDING), ("date", DESCENDING)])
-        db.attendance_logs.create_index([("emp_code", ASCENDING), ("punch_in", DESCENDING)])
-    except Exception:
-        pass
+    db.attendance_logs.create_index([("emp_code", ASCENDING), ("date", ASCENDING)], unique=True)
+    db.attendance_logs.create_index([("date", DESCENDING), ("emp_code", ASCENDING)])
+    db.attendance_logs.create_index([("date", ASCENDING), ("late_minutes", ASCENDING), ("emp_code", ASCENDING)])
+    db.attendance_logs.create_index([("status", ASCENDING), ("date", DESCENDING)])
+    db.attendance_logs.create_index([("emp_code", ASCENDING), ("punch_in", DESCENDING)])
 
 
 @asynccontextmanager
@@ -343,8 +350,16 @@ def punch_out(body: PunchOutRequest):
     overtime = compute_overtime(punch_out_dt, emp["shift_start"], emp["shift_end"], rec["date"])
     half_day = compute_half_day(work_hours)
 
+    punch_filter = {
+        "emp_code": body.emp_code,
+        "date": rec["date"],
+        "punch_out": None,
+        "punch_in": rec["punch_in"],
+        "status": rec.get("status"),
+    }
+
     updated = db.attendance_logs.find_one_and_update(
-        {"emp_code": body.emp_code, "date": rec["date"], "punch_out": None},
+        punch_filter,
         {
             "$set": {
                 "punch_out": punch_out_dt,
@@ -356,7 +371,7 @@ def punch_out(body: PunchOutRequest):
         return_document=ReturnDocument.AFTER
     )
     if not updated:
-        raise HTTPException(status_code=409, detail="Record is already punched out")
+        raise HTTPException(status_code=409, detail="Record is already punched out or was concurrently modified")
 
     return serialize_attendance_record(updated)
 
@@ -520,8 +535,24 @@ def regularize_attendance(
         "half_day": new_half_day,
     }
 
+    filter_query = {
+        "emp_code": emp_code,
+        "date": date,
+        "status": rec.get("status"),
+        "punch_in": rec.get("punch_in"),
+        "punch_out": rec.get("punch_out"),
+    }
+
+    if "history" in rec and rec["history"]:
+        filter_query["history"] = rec["history"]
+    else:
+        filter_query["$or"] = [
+            {"history": {"$exists": False}},
+            {"history": []}
+        ]
+
     updated = db.attendance_logs.find_one_and_update(
-        {"emp_code": emp_code, "date": date, "history": rec.get("history", [])},
+        filter_query,
         {
             "$set": set_update,
             "$push": {"history": history_entry}
