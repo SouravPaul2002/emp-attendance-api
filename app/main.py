@@ -20,13 +20,8 @@ from pymongo.errors import DuplicateKeyError
 
 load_dotenv(override=False)
 
-MONGO_URI = os.getenv("MONGO_URI")
-MONGO_DB = os.getenv("MONGO_DB")
-
-if not MONGO_URI:
-    raise RuntimeError("MONGO_URI environment variable is required")
-if not MONGO_DB:
-    raise RuntimeError("MONGO_DB environment variable is required")
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+MONGO_DB = os.getenv("MONGO_DB", "attendance_db")
 
 client = MongoClient(
     MONGO_URI,
