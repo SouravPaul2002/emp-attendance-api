@@ -1,16 +1,16 @@
 # DECISIONS.md
 
 1. Indexes
-In init_db, I indexed employees on emp_code (unique), (department, joined_on), and joined_on. On attendance_logs, I added (emp_code, date) as unique, (date desc, emp_code asc), (date, late_minutes, emp_code), (status, date desc), and (emp_code, punch_in desc). I skipped indexing work_hours because no query filters by it.
+In init_db, I indexed employees on emp_code (unique) for fast lookups and unique creation, (department, joined_on) for department queries, and joined_on for headcount. On attendance_logs, I added (emp_code, date) unique for punch-in safety, (date desc, emp_code asc) for the attendance list, (date, late_minutes, emp_code) for the late leaderboard, (status, date desc) for status filters, and (emp_code, punch_in desc) for punch-out. I skipped work_hours because no query filters on it.
 
 2. Punch-in race
-Both requests try to insert a record for the same employee and date. The unique index on (emp_code, date) lets only the first insert succeed. The second gets a DuplicateKeyError, which my code catches and returns as 409 Conflict.
+Both requests try inserting the same employee and date. The unique index on (emp_code, date) lets only one succeed. The second gets a DuplicateKeyError, which I catch and return as 409 Conflict.
 
 3. Ties
-I used MongoDB's $rank window function so tied employees get the same rank. Because I filter for rank <= limit after ranking, two people can share 10th place and the endpoint returns 11 items.
+I used MongoDB's $rank window function so tied employees share rank numbers. Filtering for rank <= limit after ranking lets tied 10th-place employees both return.
 
 4. Headcount
-I started the aggregation on employees filtered by joined_on. Then I did a $lookup into attendance_logs with preserveNullAndEmptyArrays set to true so employees without logs are still counted.
+I aggregated from employees joined with attendance_logs using preserveNullAndEmptyArrays true. This keeps and counts employees with no logs.
 
 5. One thing you would change for 100x data
-The department trend endpoint would slow down first because it runs daily lookups across the range. I would precompute daily totals during punch-out and store them in a summary collection.
+The department trend aggregation would slow down first from daily lookups. I would precompute daily totals into a summary collection during punch-out.
