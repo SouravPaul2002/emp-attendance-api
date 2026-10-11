@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Literal, Optional, Union
 from bson import json_util
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Path, Query, status
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, StrictInt, model_validator
 from pymongo import ASCENDING, DESCENDING, MongoClient, ReturnDocument
 from pymongo.errors import DuplicateKeyError, PyMongoError
 
@@ -216,19 +216,19 @@ class EmployeeCreate(BaseModel):
 
 class PunchInRequest(BaseModel):
     emp_code: str
-    punched_at: Optional[int] = Field(None, ge=100000000000, le=4102444800000)
+    punched_at: Optional[StrictInt] = Field(None, strict=True, ge=100000000000, le=4102444800000)
     status: Literal["PRESENT", "WFH", "ON_DUTY"] = "PRESENT"
 
 
 class PunchOutRequest(BaseModel):
     emp_code: str
-    punched_at: Optional[int] = Field(None, ge=100000000000, le=4102444800000)
+    punched_at: Optional[StrictInt] = Field(None, strict=True, ge=100000000000, le=4102444800000)
 
 
 class RegularizeRequest(BaseModel):
     status: Optional[Literal["PRESENT", "ABSENT", "LEAVE", "WFH", "ON_DUTY"]] = None
-    punch_in: Optional[int] = Field(None, ge=100000000000, le=4102444800000)
-    punch_out: Optional[int] = Field(None, ge=100000000000, le=4102444800000)
+    punch_in: Optional[StrictInt] = Field(None, strict=True, ge=100000000000, le=4102444800000)
+    punch_out: Optional[StrictInt] = Field(None, strict=True, ge=100000000000, le=4102444800000)
     reason: str = Field(..., min_length=5, max_length=200)
     regularized_by: str = Field(..., min_length=1, max_length=50)
 
