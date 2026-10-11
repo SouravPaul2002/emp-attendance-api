@@ -68,6 +68,15 @@ app = FastAPI(
 # --------------------------------------------------------------------------- #
 # Helpers & Business Logic
 # --------------------------------------------------------------------------- #
+def validate_date(date_str: Optional[str]) -> Optional[date]:
+    if not isinstance(date_str, str):
+        return None
+    try:
+        return date.fromisoformat(date_str)
+    except ValueError:
+        raise HTTPException(status_code=422, detail=f"Invalid calendar date: {date_str}")
+
+
 def to_utc_dt(epoch_ms: int) -> datetime:
     epoch_s = epoch_ms // 1000
     return datetime.fromtimestamp(epoch_s, tz=timezone.utc)
@@ -208,9 +217,13 @@ class EmployeeCreate(BaseModel):
     joined_on: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
 
     @model_validator(mode="after")
-    def validate_shifts(self):
+    def validate_fields(self):
         if self.shift_start == self.shift_end:
             raise ValueError("shift_start must differ from shift_end")
+        try:
+            date.fromisoformat(self.joined_on)
+        except ValueError:
+            raise ValueError(f"Invalid calendar date for joined_on: {self.joined_on}")
         return self
 
 
@@ -250,6 +263,7 @@ def health():
 # --------------------------------------------------------------------------- #
 @app.post("/employees", status_code=201)
 def create_employee(body: EmployeeCreate):
+    validate_date(body.joined_on)
     now_utc = datetime.now(timezone.utc).replace(microsecond=0)
     doc = body.model_dump()
     doc["created_at"] = now_utc
@@ -395,6 +409,11 @@ def list_attendance(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
+    if date_from:
+        validate_date(date_from)
+    if date_to:
+        validate_date(date_to)
+
     if date_from and date_to and date_from > date_to:
         raise HTTPException(status_code=422, detail="date_from must be less than or equal to date_to")
 
@@ -423,6 +442,7 @@ def regularize_attendance(
     date: str = Path(..., pattern=r"^\d{4}-\d{2}-\d{2}$"),
     body: RegularizeRequest = ...
 ):
+    validate_date(date)
     emp = db.employees.find_one({"emp_code": emp_code})
     if not emp:
         raise HTTPException(status_code=404, detail="Employee not found")
@@ -1025,11 +1045,14 @@ def department_trend(
     from_date: str = Query(..., alias="from", pattern=r"^\d{4}-\d{2}-\d{2}$"),
     to_date: str = Query(..., alias="to", pattern=r"^\d{4}-\d{2}-\d{2}$")
 ):
+    d_from = validate_date(from_date)
+    d_to = validate_date(to_date)
+    if not d_from or not d_to:
+        raise HTTPException(status_code=422, detail="Valid 'from' and 'to' calendar dates are required")
+
     if to_date < from_date:
         raise HTTPException(status_code=422, detail="'to' must be greater than or equal to 'from'")
 
-    d_from = date.fromisoformat(from_date)
-    d_to = date.fromisoformat(to_date)
     if (d_to - d_from).days + 1 > 92:
         raise HTTPException(status_code=422, detail="Date range must not exceed 92 days")
 
@@ -1074,6 +1097,15 @@ def explain_endpoint(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100)
 ):
+    if date_from:
+        validate_date(date_from)
+    if date_to:
+        validate_date(date_to)
+    if from_date:
+        validate_date(from_date)
+    if to_date:
+        validate_date(to_date)
+
     if endpoint == "attendance_list":
         if date_from and date_to and date_from > date_to:
             raise HTTPException(status_code=422, detail="date_from must be <= date_to")
