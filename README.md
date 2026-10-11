@@ -1,58 +1,37 @@
-# Employee Attendance & Analytics API
+# Employee Attendance API
 
-A FastAPI + MongoDB backend service implementing attendance tracking (punch-in, punch-out, regularization) and analytics pipelines (monthly summaries, department aggregation, late-comers competition leaderboard, and daily moving average trend).
+## How to run it
 
-Built according to `PROBLEM_STATEMENT.docx` and `openapi.yaml` (v2.0.0).
-
----
-
-## Deliverables
-
-- `app/main.py`: Complete application code with all endpoints and startup database indexing.
-- `REVIEW.md`: Detailed audit table listing all defects identified in the starter code, symptoms, and fixes.
-- `DECISIONS.md`: Architectural decisions regarding indexes, punch-in race concurrency, rank ties, zero-log headcount, and scaling to 100x data.
-- `requirements.txt`: Minimal dependencies for running the service.
-
----
-
-## Local Setup
-
-### 1. Environment & Dependencies
+1. Install dependencies:
 ```bash
-python -m venv venv
-# Linux / macOS:
-source venv/bin/activate
-# Windows:
-venv\Scripts\activate
-
 pip install -r requirements.txt
 ```
 
-### 2. Configure Environment Variables
-Copy `.env.example` to `.env` and set your MongoDB connection details:
-```env
-MONGO_URI=mongodb://localhost:27017
-MONGO_DB=attendance_db
+2. Start the server:
+```bash
+uvicorn app.main:app --port 8000
 ```
-*(Environment variables take precedence over `.env`).*
 
-### 3. Seed Sample Data (Optional)
+## Environment variables
+
+Set these in your environment or in a `.env` file in the root folder:
+
+- `MONGO_URI`: MongoDB connection string (example: `mongodb://localhost:27017`)
+- `MONGO_DB`: database name (example: `attendance_db`)
+
+Real environment variables take priority over values in `.env`.
+
+## How to seed sample data
+
+Run the seed script if you want to load sample employees and records:
+
 ```bash
 python sample_seed.py
 ```
 
-### 4. Run Server
-```bash
-uvicorn app.main:app --port 8000
-```
-API documentation will be available at `http://127.0.0.1:8000/docs`.
+## Notes for the reviewer
 
----
-
-## Key Features & Guarantees
-
-- **Indexes at Startup**: Automatically creates unique compound index on `("emp_code", "date")`, unique on `("emp_code")`, and compound indexes supporting sorting and pagination without in-memory sorts.
-- **Race Condition Safety**: Uses atomic MongoDB updates (`find_one_and_update`) and unique constraint handling (`DuplicateKeyError` -> `409 Conflict`) for concurrent punch-ins, punch-outs, and employee creations.
-- **Rules R1 – R10 Compliance**: Correct IST calendar boundary calculations, overnight shift date alignment, 10-minute grace window for late calculation, `>= 30 min` overtime threshold, and half-up rounding.
-- **Database-Level Analytics**: Analytics pipelines (`$densify`, `$setWindowFields`, competition `$rank`, and cross-collection `$lookup`) run directly within MongoDB.
-- **Diagnostics (`/admin/explain/{endpoint}`)**: Returns execution plans using `IXSCAN` without full collection scans (`COLLSCAN`).
+All application code lives in `app/main.py`.
+Indexes are created automatically when the FastAPI app starts up in `lifespan`.
+I followed the `openapi.yaml` file for all endpoints, query parameters, and status codes.
+You can open `http://127.0.0.1:8000/docs` in a browser to see the interactive Swagger UI.

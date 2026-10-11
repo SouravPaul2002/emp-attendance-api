@@ -6,7 +6,6 @@ Env:  MONGO_URI, MONGO_DB (read from environment, .env as fallback)
 """
 import json
 import os
-import re
 from contextlib import asynccontextmanager
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
@@ -14,10 +13,10 @@ from typing import Any, Dict, List, Literal, Optional, Union
 
 from bson import json_util
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Path, Query, status
+from fastapi import FastAPI, HTTPException, Path, Query
 from pydantic import BaseModel, Field, StrictInt, model_validator
 from pymongo import ASCENDING, DESCENDING, MongoClient, ReturnDocument
-from pymongo.errors import DuplicateKeyError, PyMongoError
+from pymongo.errors import DuplicateKeyError
 
 load_dotenv(override=False)
 

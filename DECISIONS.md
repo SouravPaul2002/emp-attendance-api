@@ -1,18 +1,16 @@
 # DECISIONS.md
 
-1. **Indexes created by `init_db()`**:
-   - `employees`: unique `emp_code`, `(department, joined_on)`, and `joined_on`.
-   - `attendance_logs`: unique `(emp_code, date)`, `(date DESC, emp_code ASC)` for sorted pagination, `(date, late_minutes, emp_code)` for leaderboard queries, `(status, date DESC)`, and `(emp_code, punch_in DESC)` for punch-outs.
-   - *Rejected*: `{ work_hours: 1 }` due to write overhead while analytics queries filter primarily by date.
+1. Indexes
+In init_db, I indexed employees on emp_code (unique), (department, joined_on), and joined_on. On attendance_logs, I added (emp_code, date) as unique, (date desc, emp_code asc), (date, late_minutes, emp_code), (status, date desc), and (emp_code, punch_in desc). I skipped indexing work_hours because no query filters by it.
 
-2. **Punch-in race**:
-   The unique index on `(emp_code, date)` guarantees WiredTiger accepts only one insert. The losing concurrent request raises `DuplicateKeyError`, caught and returned as 409 Conflict.
+2. Punch-in race
+Both requests try to insert a record for the same employee and date. The unique index on (emp_code, date) lets only the first insert succeed. The second gets a DuplicateKeyError, which my code catches and returns as 409 Conflict.
 
-3. **Leaderboard ties**:
-   We use MongoDB’s `$rank` window function (`rank <= limit`). Tied employees share ranks (e.g., 1, 2, 2, 4), sorted by `total_late_minutes` descending then `emp_code` ascending, correctly allowing returned results to exceed `limit`.
+3. Ties
+I used MongoDB's $rank window function so tied employees get the same rank. Because I filter for rank <= limit after ranking, two people can share 10th place and the endpoint returns 11 items.
 
-4. **Headcount**:
-   Aggregation starts from `employees` (filtering `joined_on <= period_end`), joining `attendance_logs` with `preserveNullAndEmptyArrays: true`. Employees with zero logs are retained and counted in headcount.
+4. Headcount
+I started the aggregation on employees filtered by joined_on. Then I did a $lookup into attendance_logs with preserveNullAndEmptyArrays set to true so employees without logs are still counted.
 
-5. **100x scale change**:
-   Maintain incremental rollups on punch-out and regularization into pre-aggregated daily/monthly summary collections, eliminating full-collection aggregations.
+5. One thing you would change for 100x data
+The department trend endpoint would slow down first because it runs daily lookups across the range. I would precompute daily totals during punch-out and store them in a summary collection.
