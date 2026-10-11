@@ -343,22 +343,15 @@ def punch_out(body: PunchOutRequest):
     rec = db.attendance_logs.find_one(
         {
             "emp_code": body.emp_code,
-            "$or": [{"punch_out": None}, {"punch_out": {"$exists": False}}],
             "punch_in": {"$lte": punch_out_dt, "$ne": None},
         },
         sort=[("punch_in", DESCENDING)]
     )
     if not rec:
-        any_rec = db.attendance_logs.find_one(
-            {
-                "emp_code": body.emp_code,
-                "punch_in": {"$lte": punch_out_dt, "$ne": None},
-            },
-            sort=[("punch_in", DESCENDING)]
-        )
-        if any_rec and any_rec.get("punch_out") is not None:
-            raise HTTPException(status_code=409, detail="Record is already punched out")
         raise HTTPException(status_code=404, detail="No matching punch-in found")
+
+    if rec.get("punch_out") is not None:
+        raise HTTPException(status_code=409, detail="Record is already punched out")
 
     punch_in_dt = rec["punch_in"]
     if punch_in_dt.tzinfo is None:
