@@ -1,10 +1,31 @@
+# Virtual environments
 venv/
 .venv/
+
+# Environment variables
 .env
+.env.example
+
+# Python cache & build artifacts
 __pycache__/
 *.pyc
 *.pyo
 .pytest_cache/
-~$*
+
+# IDE / Editor configuration
 .vscode/
 pyrightconfig.json
+~$*
+.idea/
+*.swp
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Candidate kit & reference materials (not included in final submission)
+PROBLEM_STATEMENT.docx
+openapi.yaml
+DATA_MODEL.md
+sample_seed.py
+sample_data/
