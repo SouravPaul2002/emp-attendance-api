@@ -21,17 +21,8 @@ Set these in your environment or in a `.env` file in the root folder:
 
 Real environment variables take priority over values in `.env`.
 
-## How to seed sample data
-
-Run the seed script if you want to load sample employees and records:
-
-```bash
-python sample_seed.py
-```
-
 ## Notes for the reviewer
 
 All application code lives in `app/main.py`.
 Indexes are created automatically when the FastAPI app starts up in `lifespan`.
-I followed the `openapi.yaml` file for all endpoints, query parameters, and status codes.
 You can open `http://127.0.0.1:8000/docs` in a browser to see the interactive Swagger UI.
